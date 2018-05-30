@@ -44,15 +44,18 @@ def main():
     #creates polecart enviroment
     env = gym.make('CartPole-v0')
 
+    #number of episodes run before network is updated
+    setLength = 5
+
     #properties of the neural network
     inputNodes      = [0,0,0,0]
     outputNodes     = [0,0]
     weights         = nprnd.rand(2,4)*2 - 1
     biases          = nprnd.random(2)*2 - 1
-    learnRate       = 10
+    learnRate       = 1
 
-    #stores history of inputs, outputs, actions, and opposite actions for one simulation
-    #opposite actions are used in the case where a simulation is unsuccessful
+    #stores history of inputs, outputs, actions, and opposite actions for one episode
+    #opposite actions are used in the case where a episode is unsuccessful
     inputList  = []
     outputList = []
     actionList = []
@@ -63,12 +66,12 @@ def main():
     reward     = 0
     rewardList = []
 
-    for i_episode in range(200):
+    for episode in range(200):
         #resets polecart enviroment
         observation = env.reset()
 
-        for t in range(1000):
-            #renders next timestep of polecart simulation
+        for t in range(200):
+            #renders next timestep of polecart episode
             env.render()
 
             #updates input and output nodes, then selects an action
@@ -85,34 +88,55 @@ def main():
             actionList.append(action)
             oppActionList.append( abs(action-1) )
 
-            #reports length of simulation and ends simulation
+            #reports length of episode and ends episode
             if done:
                 print("Simulation finished after {} timesteps".format(t+1))
                 reward = t+1
                 rewardList.append(reward)
                 break
 
-        #encourages actions performed if simulation is successful
-        #encourages opposite of actions performed if simulation is unsuccessful
-        if reward >= avgReward:
-            learn(inputList, outputList, actionList, weights, biases, learnRate)
-        elif reward < avgReward:
-            learn(inputList, outputList, oppActionList, weights, biases, learnRate)
+        #updates network after a given number of runs
+        if ( (episode + 1) % setLength == 0 ):
+            print("Updating network after ", episode + 1, " episodes")
 
-        #resets inputList, outputList, actionList, and updates last reward
-        inputList  = []
-        outputList = []
-        actionList = []
-        oppActionList = []
-        avgReward  = sum(rewardList)/len(rewardList)
+            epStart = 0
+            setStart = episode - setLength + 1
+            setEnd   = episode
 
-    #plots a trendline of simulation lengths
+            avgReward = sum(rewardList[setStart:setEnd]) / setLength
+
+            #updates network once for each episode in a set
+            for i in range(setLength):
+                epEnd = epStart + rewardList[i] - 1
+
+                #inputs, outputs, actions, opposite actions for one set
+                epInputs  = inputList[epStart:epEnd]
+                epOutputs = outputList[epStart:epEnd]
+                epActions = actionList[epStart:epEnd]
+                epOppActions = oppActionList[epStart:epEnd]
+
+                epStart = epEnd + 1
+
+                #encourages actions performed if episode is successful
+                if (rewardList[setStart + i] >= avgReward):
+                    learn(epInputs, epOutputs, epActions, weights, biases, learnRate)
+                #encourages opposite of actions performed if episode of unsuccessful
+                elif (rewardList[setStart + i] < avgReward):
+                    learn(epInputs, epOutputs, epOppActions, weights, biases, learnRate)
+
+            #resets inputList, outputList, actionList, and updates last reward
+            inputList  = []
+            outputList = []
+            actionList = []
+            oppActionList = []
+
+    #plots a trendline of episode lengths
     runList = [i for i in range( len(rewardList) )]
     z = np.polyfit(runList, rewardList, 1)
     p = np.poly1d(z)
     plt.plot(runList, p(runList), "r--")
 
-    #plots a scatterplot of simulation lengths
+    #plots a scatterplot of episode lengths
     plt.scatter(runList, rewardList)
     plt.show()
 
