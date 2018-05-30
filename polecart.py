@@ -4,29 +4,38 @@ import numpy as np
 import numpy.random as nprnd
 import matplotlib.pyplot as plt
 
+#bounds inputted x between (-1,1)
 def sigmoid(x):
     return ( 1/(1 + np.exp(-x)) )
 
+#selects a random output, favoring the largest one
 def makeChoice(outputs):
     return int( outputs[1] > nprnd.random()*(outputs[1] + outputs[0]) )
 
-def setChoices(inputs, weights):
+#creates output nodes from input nodes and weights
+def setChoices(inputs, weights, biases):
     outputs = [0,0]
     for i in range( len(outputs) ):
+        outputs[i] += biases[i]
+
         for j in range( len(inputs) ):
             outputs[i] += weights[i][j]*inputs[j]
     return sigmoid(outputs[0]), sigmoid(outputs[1])
 
-def learn(inputList, outputList, actionList, weights, learnRate):
+#updates weights and biases from outcomes of actions using linear regression
+def learn(inputList, outputList, actionList, weights, biases, learnRate):
     for t in range( len(actionList) ):
         action = actionList[t]
 
         for i in range( len(outputList[t]) ):
-            correct = 1 - abs(action - i)
-            dEdn = outputList[t][i] - correct
+            output = outputList[t][i]
+            correct = 1 - abs(action - i)   #1 when weight or bias corresponds to correct output
+            dEdn = output - correct
+            dndb = output * (1 - output)
+            dEdb = dEdn * dndb
 
             for j in range( len(inputList[t]) ):
-                dndw = inputList[t][j]*outputList[t][i]*(1 - outputList[t][i])
+                dndw = inputList[t][j] * output * (1 - output)
                 dEdw = dEdn * dndw
                 weights[i][j] -= learnRate * dEdw
 
@@ -39,10 +48,11 @@ def main():
     inputNodes      = [0,0,0,0]
     outputNodes     = [0,0]
     weights         = nprnd.rand(2,4)*2 - 1
-#    biases          = nprnd.random(2)*2 - 1
+    biases          = nprnd.random(2)*2 - 1
     learnRate       = 10
 
-    #stores history of inputs and corresponding outputs and actions performed
+    #stores history of inputs, outputs, actions, and opposite actions for one simulation
+    #opposite actions are used in the case where a simulation is unsuccessful
     inputList  = []
     outputList = []
     actionList = []
@@ -63,7 +73,7 @@ def main():
 
             #updates input and output nodes, then selects an action
             inputNodes  = observation
-            outputNodes = setChoices(inputNodes, weights)
+            outputNodes = setChoices(inputNodes, weights, biases)
             action      = makeChoice(outputNodes)
 
             #updates values for current timestep
@@ -75,17 +85,19 @@ def main():
             actionList.append(action)
             oppActionList.append( abs(action-1) )
 
-            #reports length of simulation and starts a new simulation
+            #reports length of simulation and ends simulation
             if done:
                 print("Simulation finished after {} timesteps".format(t+1))
                 reward = t+1
                 rewardList.append(reward)
                 break
 
+        #encourages actions performed if simulation is successful
+        #encourages opposite of actions performed if simulation is unsuccessful
         if reward >= avgReward:
-            learn(inputList, outputList, actionList, weights, learnRate)
+            learn(inputList, outputList, actionList, weights, biases, learnRate)
         elif reward < avgReward:
-            learn(inputList, outputList, oppActionList, weights, learnRate)
+            learn(inputList, outputList, oppActionList, weights, biases, learnRate)
 
         #resets inputList, outputList, actionList, and updates last reward
         inputList  = []
@@ -94,11 +106,13 @@ def main():
         oppActionList = []
         avgReward  = sum(rewardList)/len(rewardList)
 
+    #plots a trendline of simulation lengths
     runList = [i for i in range( len(rewardList) )]
     z = np.polyfit(runList, rewardList, 1)
     p = np.poly1d(z)
     plt.plot(runList, p(runList), "r--")
 
+    #plots a scatterplot of simulation lengths
     plt.scatter(runList, rewardList)
     plt.show()
 
